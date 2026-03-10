@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   CheckCircle2,
   RefreshCw,
@@ -51,13 +55,14 @@ const PRESIDENTS = [
   { id: 39, president: "Jimmy Carter", years: "1977–1981", notable: "Camp David Accords" },
   { id: 40, president: "Ronald Reagan", years: "1981–1989", notable: "Reaganomics" },
   { id: 41, president: "George H.W. Bush", years: "1989–1993", notable: "Gulf War" },
-  { id: 42, president: "Bill Clinton", years: "1993–2001", notable: "Second Impeachment" },
+  { id: 42, president: "Bill Clinton", years: "1993–2001", notable: "Impeachment / Economic Boom" },
   { id: 43, president: "George W. Bush", years: "2001–2009", notable: "9/11 / War on Terror" },
 ];
 
 const GROUP_SIZE = 5;
 const ROUND_CATEGORIES = ["President", "Number", "Years", "Notable"];
 const DEFAULT_MESSAGE = "Select 4 cards that belong to the same president.";
+const QUIZ_DEFAULT_MESSAGE = "Type the president number and years served, then choose the notable event.";
 
 function shuffle(array) {
   const copy = [...array];
@@ -66,6 +71,31 @@ function shuffle(array) {
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
+}
+
+function uniqueValues(values) {
+  return [...new Set(values)];
+}
+
+function pickOptions(values, correctValue, count = 4) {
+  const wrongChoices = shuffle(
+    uniqueValues(values).filter((value) => value !== correctValue)
+  ).slice(0, count - 1);
+
+  return shuffle([correctValue, ...wrongChoices]);
+}
+
+function buildQuizQuestions() {
+  return shuffle(
+    PRESIDENTS.map((item) => ({
+      presidentId: item.id,
+      president: item.president,
+      correctNumber: `#${item.id}`,
+      correctYears: item.years,
+      correctNotable: item.notable,
+      notableOptions: pickOptions(PRESIDENTS.map((p) => p.notable), item.notable),
+    }))
+  );
 }
 
 function buildRounds() {
@@ -92,10 +122,14 @@ function getGroupStatus(selection) {
   if (selection.length !== 4) return null;
 
   const samePresident = selection.every((tile) => tile.presidentId === selection[0].presidentId);
-  if (samePresident) return { type: "correct", presidentId: selection[0].presidentId };
+  if (samePresident) {
+    return { type: "correct", presidentId: selection[0].presidentId };
+  }
 
   const sameCategory = selection.every((tile) => tile.category === selection[0].category);
-  if (sameCategory) return { type: "same-category" };
+  if (sameCategory) {
+    return { type: "same-category" };
+  }
 
   const byPresident = new Map();
   selection.forEach((tile) => {
@@ -103,7 +137,9 @@ function getGroupStatus(selection) {
   });
 
   const maxFromOnePresident = Math.max(...byPresident.values());
-  if (maxFromOnePresident === 3) return { type: "one-away" };
+  if (maxFromOnePresident === 3) {
+    return { type: "one-away" };
+  }
 
   return { type: "wrong" };
 }
@@ -114,60 +150,8 @@ function formatTime(totalSeconds) {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-function panelClass(extra = "") {
-  return `rounded-[2rem] bg-white shadow-lg ${extra}`;
-}
-
-function badgeClass() {
-  return "rounded-xl bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700";
-}
-
-function buttonBase() {
-  return "inline-flex items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold transition";
-}
-
-function PrimaryButton({ children, className = "", ...props }) {
-  return (
-    <button
-      {...props}
-      className={`${buttonBase()} bg-slate-900 text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function SecondaryButton({ children, className = "", ...props }) {
-  return (
-    <button
-      {...props}
-      className={`${buttonBase()} bg-slate-100 text-slate-900 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function OutlineButton({ children, className = "", ...props }) {
-  return (
-    <button
-      {...props}
-      className={`${buttonBase()} border border-slate-300 bg-white text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ProgressBar({ value }) {
-  return (
-    <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
-      <div
-        className="h-full rounded-full bg-slate-900 transition-all duration-300"
-        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
-      />
-    </div>
-  );
+function normalizeText(value) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function SolvedGroupCard({ president }) {
@@ -178,9 +162,15 @@ function SolvedGroupCard({ president }) {
       </div>
       <div className="text-lg font-bold text-slate-900">{president.president}</div>
       <div className="mt-2 grid gap-2 text-sm text-slate-700 md:grid-cols-3">
-        <div className="rounded-2xl bg-white/80 px-3 py-2"><span className="font-semibold">Number:</span> #{president.id}</div>
-        <div className="rounded-2xl bg-white/80 px-3 py-2"><span className="font-semibold">Years:</span> {president.years}</div>
-        <div className="rounded-2xl bg-white/80 px-3 py-2"><span className="font-semibold">Notable:</span> {president.notable}</div>
+        <div className="rounded-2xl bg-white/80 px-3 py-2">
+          <span className="font-semibold">Number:</span> #{president.id}
+        </div>
+        <div className="rounded-2xl bg-white/80 px-3 py-2">
+          <span className="font-semibold">Years:</span> {president.years}
+        </div>
+        <div className="rounded-2xl bg-white/80 px-3 py-2">
+          <span className="font-semibold">Notable:</span> {president.notable}
+        </div>
       </div>
     </div>
   );
@@ -197,9 +187,15 @@ function FailedRoundAnswers({ round }) {
           <div key={president.id} className="rounded-2xl bg-white/80 p-3 text-sm">
             <div className="font-bold text-slate-900">{president.president}</div>
             <div className="mt-2 grid gap-2 md:grid-cols-3">
-              <div className="rounded-xl bg-red-50 px-3 py-2"><span className="font-semibold">Number:</span> #{president.id}</div>
-              <div className="rounded-xl bg-red-50 px-3 py-2"><span className="font-semibold">Years:</span> {president.years}</div>
-              <div className="rounded-xl bg-red-50 px-3 py-2"><span className="font-semibold">Notable:</span> {president.notable}</div>
+              <div className="rounded-xl bg-red-50 px-3 py-2">
+                <span className="font-semibold">Number:</span> #{president.id}
+              </div>
+              <div className="rounded-xl bg-red-50 px-3 py-2">
+                <span className="font-semibold">Years:</span> {president.years}
+              </div>
+              <div className="rounded-xl bg-red-50 px-3 py-2">
+                <span className="font-semibold">Notable:</span> {president.notable}
+              </div>
             </div>
           </div>
         ))}
@@ -208,7 +204,96 @@ function FailedRoundAnswers({ round }) {
   );
 }
 
+function QuizInput({ label, value, onChange, disabled, correctValue, submitted, placeholder, isCorrect }) {
+  const isWrong = submitted && value.trim() && !isCorrect;
+
+  const wrapperClass = submitted
+    ? isCorrect
+      ? "rounded-3xl border border-emerald-200 bg-emerald-50 p-4"
+      : "rounded-3xl border border-red-200 bg-red-50 p-4"
+    : "rounded-3xl border border-slate-200 bg-slate-50 p-4";
+
+  return (
+    <div className={wrapperClass}>
+      <label className="mb-2 block text-sm font-bold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </label>
+
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder={placeholder}
+        className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-500"
+      />
+
+      {submitted && (
+        <div className="mt-3 text-sm">
+          {isCorrect ? (
+            <div className="font-semibold text-emerald-700">Correct</div>
+          ) : isWrong ? (
+            <div className="font-semibold text-red-700">
+              Correct answer: <span className="text-slate-900">{correctValue}</span>
+            </div>
+          ) : (
+            <div className="font-semibold text-red-700">
+              Correct answer: <span className="text-slate-900">{correctValue}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuizSelect({ label, value, options, onChange, disabled, correctValue, submitted }) {
+  const isCorrect = submitted && value === correctValue;
+  const isWrong = submitted && value && value !== correctValue;
+
+  const wrapperClass = isCorrect
+    ? "rounded-3xl border border-emerald-200 bg-emerald-50 p-4"
+    : isWrong
+      ? "rounded-3xl border border-red-200 bg-red-50 p-4"
+      : "rounded-3xl border border-slate-200 bg-slate-50 p-4";
+
+  return (
+    <div className={wrapperClass}>
+      <label className="mb-2 block text-sm font-bold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-500"
+      >
+        <option value="">Select an answer</option>
+        {options.map((option) => (
+          <option key={`${label}-${option}`} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+
+      {submitted && (
+        <div className="mt-3 text-sm">
+          {isCorrect ? (
+            <div className="font-semibold text-emerald-700">Correct</div>
+          ) : (
+            <div className="font-semibold text-red-700">
+              Correct answer: <span className="text-slate-900">{correctValue}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PresidentsConnectionsGame() {
+  const [mode, setMode] = useState("connections");
+
   const [rounds, setRounds] = useState(() => buildRounds());
   const [roundIndex, setRoundIndex] = useState(0);
   const [selectedTileIds, setSelectedTileIds] = useState([]);
@@ -220,6 +305,22 @@ export default function PresidentsConnectionsGame() {
   const [shakeBoard, setShakeBoard] = useState(false);
   const [roundFailed, setRoundFailed] = useState(false);
   const [roundShuffleSeed, setRoundShuffleSeed] = useState(0);
+
+  const [quizQuestions, setQuizQuestions] = useState(() => buildQuizQuestions());
+  const [quizIndex, setQuizIndex] = useState(0);
+  const [quizAnswers, setQuizAnswers] = useState({
+    number: "",
+    years: "",
+    notable: "",
+  });
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizScore, setQuizScore] = useState(0);
+  const [quizMessage, setQuizMessage] = useState(QUIZ_DEFAULT_MESSAGE);
+  const [quizResult, setQuizResult] = useState({
+    numberCorrect: false,
+    yearsCorrect: false,
+    notableCorrect: false,
+  });
 
   const currentRound = rounds[roundIndex] || [];
   const solvedPresidentIds = solvedPresidentIdsByRound[roundIndex] || [];
@@ -236,19 +337,31 @@ export default function PresidentsConnectionsGame() {
   const progress = (completedRounds.length / rounds.length) * 100;
   const allDone = completedRounds.length === rounds.length;
 
+  const currentQuizQuestion = quizQuestions[quizIndex] || null;
+  const quizComplete = quizIndex >= quizQuestions.length;
+  const quizProgress = quizQuestions.length > 0 ? (quizIndex / quizQuestions.length) * 100 : 0;
+
   useEffect(() => {
-    const interval = window.setInterval(() => setElapsedSeconds((prev) => prev + 1), 1000);
+    const interval = window.setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+
     return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (!shakeBoard) return undefined;
-    const timeout = window.setTimeout(() => setShakeBoard(false), 500);
+
+    const timeout = window.setTimeout(() => {
+      setShakeBoard(false);
+    }, 500);
+
     return () => window.clearTimeout(timeout);
   }, [shakeBoard]);
 
   useEffect(() => {
     if (mistakes < 4) return;
+
     setRoundFailed(true);
     setSelectedTileIds([]);
     setShakeBoard(true);
@@ -277,8 +390,96 @@ export default function PresidentsConnectionsGame() {
     setRoundShuffleSeed((prev) => prev + 1);
   };
 
+  const restartQuiz = () => {
+    setQuizQuestions(buildQuizQuestions());
+    setQuizIndex(0);
+    setQuizAnswers({
+      number: "",
+      years: "",
+      notable: "",
+    });
+    setQuizSubmitted(false);
+    setQuizScore(0);
+    setQuizMessage(QUIZ_DEFAULT_MESSAGE);
+    setQuizResult({
+      numberCorrect: false,
+      yearsCorrect: false,
+      notableCorrect: false,
+    });
+  };
+
+  const nextQuizQuestion = () => {
+    if (!quizSubmitted) {
+      setQuizMessage("Submit this question before moving on.");
+      return;
+    }
+
+    setQuizIndex((prev) => prev + 1);
+    setQuizAnswers({
+      number: "",
+      years: "",
+      notable: "",
+    });
+    setQuizSubmitted(false);
+    setQuizMessage(QUIZ_DEFAULT_MESSAGE);
+    setQuizResult({
+      numberCorrect: false,
+      yearsCorrect: false,
+      notableCorrect: false,
+    });
+  };
+
+  const submitQuizAnswer = () => {
+    if (!currentQuizQuestion) return;
+
+    if (!quizAnswers.number.trim() || !quizAnswers.years.trim() || !quizAnswers.notable) {
+      setQuizMessage("Fill in both typed answers and the dropdown first.");
+      return;
+    }
+
+    if (quizSubmitted) return;
+
+    const normalizedNumber = normalizeText(quizAnswers.number);
+    const normalizedYears = normalizeText(quizAnswers.years);
+    const normalizedCorrectNumber = normalizeText(currentQuizQuestion.correctNumber);
+    const normalizedCorrectNumberNoHash = normalizeText(currentQuizQuestion.correctNumber.replace("#", ""));
+    const normalizedCorrectYears = normalizeText(currentQuizQuestion.correctYears);
+
+    const numberCorrect =
+      normalizedNumber === normalizedCorrectNumber ||
+      normalizedNumber === normalizedCorrectNumberNoHash;
+
+    const yearsCorrect = normalizedYears === normalizedCorrectYears;
+    const notableCorrect = quizAnswers.notable === currentQuizQuestion.correctNotable;
+
+    const correctCount =
+      (numberCorrect ? 1 : 0) +
+      (yearsCorrect ? 1 : 0) +
+      (notableCorrect ? 1 : 0);
+
+    const allCorrect = correctCount === 3;
+
+    setQuizResult({
+      numberCorrect,
+      yearsCorrect,
+      notableCorrect,
+    });
+
+    if (allCorrect) {
+      setQuizScore((prev) => prev + 1);
+      setQuizMessage(`Correct — ${currentQuizQuestion.president} matched perfectly.`);
+    } else {
+      setQuizMessage(
+        `${correctCount}/3 correct. ${currentQuizQuestion.president} was president ${currentQuizQuestion.correctNumber}, served ${currentQuizQuestion.correctYears}, and is associated with ${currentQuizQuestion.correctNotable}.`
+      );
+    }
+
+    setQuizSubmitted(true);
+  };
+
   const toggleTile = (tileId) => {
     if (roundSolved || roundFailed) return;
+
     setMessage(DEFAULT_MESSAGE);
     setSelectedTileIds((prev) => {
       if (prev.includes(tileId)) return prev.filter((id) => id !== tileId);
@@ -305,18 +506,25 @@ export default function PresidentsConnectionsGame() {
       setMessage("This round is over. Click Try Again to restart with a new shuffle.");
       return;
     }
+
     if (selectedTiles.length !== 4) {
       setMessage("Pick exactly 4 cards first.");
       return;
     }
 
     const status = getGroupStatus(selectedTiles);
+
     if (status?.type === "correct") {
       const president = currentRound.find((p) => p.id === status.presidentId);
       const nextSolved = [...solvedPresidentIds, status.presidentId];
-      setSolvedPresidentIdsByRound((prev) => ({ ...prev, [roundIndex]: nextSolved }));
+
+      setSolvedPresidentIdsByRound((prev) => ({
+        ...prev,
+        [roundIndex]: nextSolved,
+      }));
       setSelectedTileIds([]);
       setMessage(`Correct: ${president?.president ?? "President"} matched.`);
+
       if (nextSolved.length === currentRound.length && !completedRounds.includes(roundIndex)) {
         setCompletedRounds((prev) => [...prev, roundIndex]);
       }
@@ -325,14 +533,17 @@ export default function PresidentsConnectionsGame() {
 
     setMistakes((prev) => prev + 1);
     setShakeBoard(true);
+
     if (status?.type === "one-away") {
       setMessage("One away — 3 of those cards belong together.");
       return;
     }
+
     if (status?.type === "same-category") {
       setMessage("Those are all the same type of clue, not the same president.");
       return;
     }
+
     setMessage("Not a match. Try another set of 4.");
   };
 
@@ -341,10 +552,12 @@ export default function PresidentsConnectionsGame() {
       setMessage("This round is over. Click Try Again to restart with a new shuffle.");
       return;
     }
+
     if (!roundSolved) {
       setMessage("Finish this set before moving on.");
       return;
     }
+
     setRoundIndex((prev) => Math.min(prev + 1, rounds.length - 1));
     resetRoundState();
   };
@@ -354,6 +567,7 @@ export default function PresidentsConnectionsGame() {
       setMessage("This round is over. Click Try Again to restart with a new shuffle.");
       return;
     }
+
     setRoundIndex((prev) => Math.max(prev - 1, 0));
     resetRoundState();
   };
@@ -362,184 +576,386 @@ export default function PresidentsConnectionsGame() {
     ? "mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
     : "mb-4 rounded-2xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700";
 
+  const quizMessageClass = quizSubmitted
+    ? quizMessage.includes("Correct —")
+      ? "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+      : "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800"
+    : "rounded-2xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700";
+
   return (
-    <div className="min-h-screen bg-[#f7f6f3] p-4 md:p-8 text-slate-900">
+    <div className="min-h-screen bg-[#f7f6f3] p-4 md:p-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div className={panelClass()}>
-            <div className="p-6 pb-3">
+          <Card className="rounded-[2rem] border-0 bg-white shadow-lg">
+            <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h1 className="text-2xl font-bold md:text-3xl">Presidents Connections</h1>
+                  <CardTitle className="text-2xl md:text-3xl">Presidents Study Game</CardTitle>
                   <p className="mt-2 text-sm text-slate-600 md:text-base">
-                    Tap 4 clickable cards that belong to the same president: name, president number, years, and notable event.
+                    {mode === "connections"
+                      ? "Play the matching game or switch to quiz mode."
+                      : "Quiz mode: type the president number and years served, then choose the notable event."}
                   </p>
                 </div>
-                <OutlineButton onClick={restartGame}>
-                  <RefreshCw className="mr-2 h-4 w-4" /> New Random Game
-                </OutlineButton>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => setMode("connections")}
+                    variant={mode === "connections" ? "default" : "outline"}
+                    className="rounded-2xl"
+                  >
+                    Connections
+                  </Button>
+                  <Button
+                    onClick={() => setMode("quiz")}
+                    variant={mode === "quiz" ? "default" : "outline"}
+                    className="rounded-2xl"
+                  >
+                    Quiz
+                  </Button>
+                  {mode === "connections" ? (
+                    <Button onClick={restartGame} variant="outline" className="rounded-2xl">
+                      <RefreshCw className="mr-2 h-4 w-4" /> New Random Game
+                    </Button>
+                  ) : (
+                    <Button onClick={restartQuiz} variant="outline" className="rounded-2xl">
+                      <RefreshCw className="mr-2 h-4 w-4" /> New Quiz
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="space-y-4 p-6 pt-0">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className={badgeClass()}>Round {roundIndex + 1} / {rounds.length}</span>
-                <span className={badgeClass()}>5 presidents in this set</span>
-                <span className={badgeClass()}>Solved total: {totalSolved} / {PRESIDENTS.length}</span>
-                <span className={badgeClass()}>Time: {formatTime(elapsedSeconds)}</span>
-              </div>
-              <ProgressBar value={progress} />
-            </div>
-          </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4">
+              {mode === "connections" ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Badge className="rounded-xl px-3 py-1 text-sm">Round {roundIndex + 1} / {rounds.length}</Badge>
+                    <Badge variant="secondary" className="rounded-xl px-3 py-1 text-sm">5 presidents in this set</Badge>
+                    <Badge variant="secondary" className="rounded-xl px-3 py-1 text-sm">Solved total: {totalSolved} / {PRESIDENTS.length}</Badge>
+                    <Badge variant="secondary" className="rounded-xl px-3 py-1 text-sm">Time: {formatTime(elapsedSeconds)}</Badge>
+                  </div>
+                  <Progress value={progress} className="h-3" />
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Badge className="rounded-xl px-3 py-1 text-sm">
+                      Question {Math.min(quizIndex + 1, quizQuestions.length)} / {quizQuestions.length}
+                    </Badge>
+                    <Badge variant="secondary" className="rounded-xl px-3 py-1 text-sm">
+                      Perfect answers: {quizScore}
+                    </Badge>
+                  </div>
+                  <Progress value={quizProgress} className="h-3" />
+                </>
+              )}
+            </CardContent>
+          </Card>
         </motion.div>
 
-        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className={panelClass()}>
-            <div className="p-5">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Round {roundIndex + 1}</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900">Find each president’s 4 matching cards</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-slate-500">Mistakes remaining</div>
-                  <div className="mt-1 flex justify-end gap-1">
-                    {[0, 1, 2, 3].map((dot) => (
-                      <div key={dot} className={`h-3 w-3 rounded-full ${dot < 4 - mistakes ? "bg-slate-900" : "bg-slate-300"}`} />
-                    ))}
-                  </div>
-                  <div className="mt-2 text-xs font-medium text-slate-500">{Math.max(0, 4 - mistakes)} left</div>
-                </div>
-              </div>
-
-              <div className={messageClass}>{message}</div>
-
-              <>
-                {roundFailed && <FailedRoundAnswers round={unsolvedPresidents} />}
-
-                <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {ROUND_CATEGORIES.map((category) => (
-                    <div key={category} className="rounded-2xl bg-slate-50 px-3 py-2 text-center text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                      {category}
+        {mode === "connections" ? (
+          <>
+            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <Card className="rounded-[2rem] border-0 bg-white shadow-lg">
+                <CardContent className="p-5">
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Round {roundIndex + 1}
+                      </div>
+                      <div className="mt-1 text-lg font-semibold text-slate-900">
+                        Find each president’s 4 matching cards
+                      </div>
                     </div>
-                  ))}
-                </div>
-
-                <AnimatePresence>
-                  {solvedPresidents.length > 0 && (
-                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4 space-y-3">
-                      {solvedPresidents.map((president) => (
-                        <SolvedGroupCard key={president.id} president={president} />
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <motion.div
-                  animate={shakeBoard ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
-                  transition={{ duration: 0.45 }}
-                  className="grid grid-cols-2 gap-3 sm:grid-cols-4"
-                >
-                  {availableTiles.map((tile) => {
-                    const selected = selectedTileIds.includes(tile.tileId);
-                    const tileClass = selected
-                      ? roundFailed || shakeBoard
-                        ? "scale-[0.98] border-red-600 bg-red-600 text-white shadow-lg"
-                        : "scale-[0.98] border-slate-900 bg-slate-900 text-white shadow-lg"
-                      : roundFailed
-                        ? "border-red-200 bg-red-50 text-slate-900"
-                        : "border-slate-200 bg-[#efede8] text-slate-900 hover:-translate-y-0.5 hover:shadow-md";
-
-                    return (
-                      <button
-                        key={tile.tileId}
-                        type="button"
-                        onClick={() => toggleTile(tile.tileId)}
-                        className={`min-h-[92px] rounded-3xl border px-3 py-4 text-center text-sm font-bold uppercase leading-tight transition-all md:min-h-[104px] ${tileClass}`}
-                      >
-                        <div className="line-clamp-4 break-words">{tile.label}</div>
-                      </button>
-                    );
-                  })}
-                </motion.div>
-
-                {availableTiles.length === 0 && (
-                  <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-                    Round complete. Hit Next to move to the next 5 presidents.
+                    <div className="text-right">
+                      <div className="text-sm text-slate-500">Mistakes remaining</div>
+                      <div className="mt-1 flex justify-end gap-1">
+                        {[0, 1, 2, 3].map((dot) => (
+                          <div
+                            key={dot}
+                            className={`h-3 w-3 rounded-full ${dot < 4 - mistakes ? "bg-slate-900" : "bg-slate-300"}`}
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-2 text-xs font-medium text-slate-500">
+                        {Math.max(0, 4 - mistakes)} left
+                      </div>
+                    </div>
                   </div>
-                )}
 
-                <div className="mt-5 flex flex-wrap gap-3">
-                  {!roundFailed ? (
-                    <>
-                      <PrimaryButton onClick={submitSelection}>Submit</PrimaryButton>
-                      <SecondaryButton onClick={clearSelection}>Deselect All</SecondaryButton>
-                      <OutlineButton onClick={shuffleBoard}>Shuffle Cards</OutlineButton>
-                    </>
-                  ) : (
-                    <PrimaryButton onClick={restartGame} className="bg-red-600 hover:bg-red-700">
-                      <RefreshCw className="mr-2 h-4 w-4" /> Try Again
-                    </PrimaryButton>
-                  )}
-                </div>
-              </>
+                  <div className={messageClass}>{message}</div>
+
+                  <>
+                    {roundFailed && <FailedRoundAnswers round={unsolvedPresidents} />}
+
+                    <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {ROUND_CATEGORIES.map((category) => (
+                        <div
+                          key={category}
+                          className="rounded-2xl bg-slate-50 px-3 py-2 text-center text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
+                        >
+                          {category}
+                        </div>
+                      ))}
+                    </div>
+
+                    <AnimatePresence>
+                      {solvedPresidents.length > 0 && (
+                        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4 space-y-3">
+                          {solvedPresidents.map((president) => (
+                            <SolvedGroupCard key={president.id} president={president} />
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <motion.div
+                      animate={shakeBoard ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
+                      transition={{ duration: 0.45 }}
+                      className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                    >
+                      {availableTiles.map((tile) => {
+                        const selected = selectedTileIds.includes(tile.tileId);
+                        const tileClass = selected
+                          ? roundFailed || shakeBoard
+                            ? "scale-[0.98] border-red-600 bg-red-600 text-white shadow-lg"
+                            : "scale-[0.98] border-slate-900 bg-slate-900 text-white shadow-lg"
+                          : roundFailed
+                            ? "border-red-200 bg-red-50 text-slate-900"
+                            : "border-slate-200 bg-[#efede8] text-slate-900 hover:-translate-y-0.5 hover:shadow-md";
+
+                        return (
+                          <button
+                            key={tile.tileId}
+                            type="button"
+                            onClick={() => toggleTile(tile.tileId)}
+                            className={`min-h-[92px] rounded-3xl border px-3 py-4 text-center text-sm font-bold uppercase leading-tight transition-all md:min-h-[104px] ${tileClass}`}
+                          >
+                            <div className="line-clamp-4 break-words">{tile.label}</div>
+                          </button>
+                        );
+                      })}
+                    </motion.div>
+
+                    {availableTiles.length === 0 && (
+                      <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+                        Round complete. Hit Next to move to the next 5 presidents.
+                      </div>
+                    )}
+
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      {!roundFailed ? (
+                        <>
+                          <Button onClick={submitSelection} className="rounded-2xl">Submit</Button>
+                          <Button onClick={clearSelection} variant="secondary" className="rounded-2xl">Deselect All</Button>
+                          <Button onClick={shuffleBoard} variant="outline" className="rounded-2xl">Shuffle Cards</Button>
+                        </>
+                      ) : (
+                        <Button onClick={restartGame} className="rounded-2xl bg-red-600 hover:bg-red-700">
+                          <RefreshCw className="mr-2 h-4 w-4" /> Try Again
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-[2rem] border-0 bg-white shadow-lg">
+                <CardContent className="flex h-full flex-col gap-5 p-6">
+                  <div className="flex items-center gap-3">
+                    <Trophy className="h-8 w-8" />
+                    <div>
+                      <div className="text-sm text-slate-500">Presidents solved</div>
+                      <div className="text-3xl font-bold">{totalSolved} / {PRESIDENTS.length}</div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                    In each round, every president has 4 cards:
+                    <div className="mt-2 space-y-1">
+                      <div>• Name</div>
+                      <div>• President number</div>
+                      <div>• Years in office</div>
+                      <div>• Notable event or action</div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                    Remaining in this round: <span className="font-semibold">{unsolvedPresidents.length}</span>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                    Timer: <span className="font-semibold">{formatTime(elapsedSeconds)}</span>
+                  </div>
+
+                  <div className="mt-auto flex flex-wrap gap-3">
+                    <Button onClick={previousRound} variant="outline" className="rounded-2xl" disabled={roundIndex === 0}>
+                      <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                    </Button>
+                    <Button onClick={nextRound} variant="secondary" className="rounded-2xl" disabled={isLastRound && !roundSolved}>
+                      Next <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </div>
 
-          <div className={panelClass()}>
-            <div className="flex h-full flex-col gap-5 p-6">
-              <div className="flex items-center gap-3">
-                <Trophy className="h-8 w-8" />
-                <div>
-                  <div className="text-sm text-slate-500">Presidents solved</div>
-                  <div className="text-3xl font-bold">{totalSolved} / {PRESIDENTS.length}</div>
-                </div>
-              </div>
+            {allDone && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <Card className="rounded-[2rem] border-0 bg-white shadow-xl">
+                  <CardContent className="space-y-4 p-6 text-center">
+                    <div className="text-3xl font-bold">You finished the full presidents game.</div>
+                    <div className="text-lg text-slate-600">
+                      Final solved count: <span className="font-semibold text-slate-900">{totalSolved} / {PRESIDENTS.length}</span>
+                    </div>
+                    <div className="text-base text-slate-600">
+                      Final time: <span className="font-semibold text-slate-900">{formatTime(elapsedSeconds)}</span>
+                    </div>
+                    <div className="flex justify-center">
+                      <Button onClick={restartGame} className="rounded-2xl">
+                        <RefreshCw className="mr-2 h-4 w-4" /> Play Again
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </>
+        ) : (
+          <>
+            {!quizComplete ? (
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                <Card className="rounded-[2rem] border-0 bg-white shadow-lg">
+                  <CardContent className="p-6 space-y-5">
+                    <div>
+                      <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Quiz Mode
+                      </div>
+                      <div className="mt-1 text-2xl font-bold text-slate-900">
+                        {currentQuizQuestion?.president}
+                      </div>
+                      <p className="mt-2 text-sm text-slate-600">
+                        Type the president number and years served. Choose the notable event from the dropdown.
+                      </p>
+                    </div>
 
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                In each round, every president has 4 cards:
-                <div className="mt-2 space-y-1">
-                  <div>• Name</div>
-                  <div>• President number</div>
-                  <div>• Years in office</div>
-                  <div>• Notable event or action</div>
-                </div>
-              </div>
+                    <div className={quizMessageClass}>{quizMessage}</div>
 
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                Remaining in this round: <span className="font-semibold">{unsolvedPresidents.length}</span>
-              </div>
+                    <div className="rounded-3xl bg-slate-50 p-5 text-slate-800">
+                      <div className="text-lg font-semibold">
+                        {currentQuizQuestion?.president}
+                      </div>
 
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                Timer: <span className="font-semibold">{formatTime(elapsedSeconds)}</span>
-              </div>
+                      <div className="mt-4 grid gap-4">
+                        <QuizInput
+                          label="President number"
+                          value={quizAnswers.number}
+                          onChange={(value) =>
+                            setQuizAnswers((prev) => ({ ...prev, number: value }))
+                          }
+                          disabled={quizSubmitted}
+                          correctValue={currentQuizQuestion?.correctNumber || ""}
+                          submitted={quizSubmitted}
+                          placeholder="Type like #16 or 16"
+                          isCorrect={quizResult.numberCorrect}
+                        />
 
-              <div className="mt-auto flex flex-wrap gap-3">
-                <OutlineButton onClick={previousRound} disabled={roundIndex === 0}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                </OutlineButton>
-                <SecondaryButton onClick={nextRound} disabled={isLastRound && !roundSolved}>
-                  Next <ArrowRight className="ml-2 h-4 w-4" />
-                </SecondaryButton>
-              </div>
-            </div>
-          </div>
-        </div>
+                        <QuizInput
+                          label="Years served"
+                          value={quizAnswers.years}
+                          onChange={(value) =>
+                            setQuizAnswers((prev) => ({ ...prev, years: value }))
+                          }
+                          disabled={quizSubmitted}
+                          correctValue={currentQuizQuestion?.correctYears || ""}
+                          submitted={quizSubmitted}
+                          placeholder="Type the years served"
+                          isCorrect={quizResult.yearsCorrect}
+                        />
 
-        {allDone && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div className={panelClass("shadow-xl")}>
-              <div className="space-y-4 p-6 text-center">
-                <div className="text-3xl font-bold">You finished the full presidents game.</div>
-                <div className="text-lg text-slate-600">Final solved count: <span className="font-semibold text-slate-900">{totalSolved} / {PRESIDENTS.length}</span></div>
-                <div className="text-base text-slate-600">Final time: <span className="font-semibold text-slate-900">{formatTime(elapsedSeconds)}</span></div>
-                <div className="flex justify-center">
-                  <PrimaryButton onClick={restartGame}>
-                    <RefreshCw className="mr-2 h-4 w-4" /> Play Again
-                  </PrimaryButton>
-                </div>
+                        <QuizSelect
+                          label="Notable event"
+                          value={quizAnswers.notable}
+                          options={currentQuizQuestion?.notableOptions || []}
+                          onChange={(value) =>
+                            setQuizAnswers((prev) => ({ ...prev, notable: value }))
+                          }
+                          disabled={quizSubmitted}
+                          correctValue={currentQuizQuestion?.correctNotable || ""}
+                          submitted={quizSubmitted}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                      <Button onClick={submitQuizAnswer} className="rounded-2xl">
+                        Submit Answer
+                      </Button>
+                      <Button
+                        onClick={nextQuizQuestion}
+                        variant="secondary"
+                        className="rounded-2xl"
+                      >
+                        Next Question <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[2rem] border-0 bg-white shadow-lg">
+                  <CardContent className="flex h-full flex-col gap-5 p-6">
+                    <div className="flex items-center gap-3">
+                      <Trophy className="h-8 w-8" />
+                      <div>
+                        <div className="text-sm text-slate-500">Perfect quiz answers</div>
+                        <div className="text-3xl font-bold">{quizScore} / {quizQuestions.length}</div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                      Each question asks you to:
+                      <div className="mt-2 space-y-1">
+                        <div>• Type the president number</div>
+                        <div>• Type the years served</div>
+                        <div>• Choose the notable event</div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                      Current question: <span className="font-semibold">{quizIndex + 1}</span>
+                    </div>
+
+                    <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                      Remaining questions: <span className="font-semibold">{quizQuestions.length - quizIndex - 1}</span>
+                    </div>
+
+                    <div className="mt-auto">
+                      <Button onClick={restartQuiz} variant="outline" className="rounded-2xl w-full">
+                        <RefreshCw className="mr-2 h-4 w-4" /> Restart Quiz
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </div>
-          </motion.div>
+            ) : (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <Card className="rounded-[2rem] border-0 bg-white shadow-xl">
+                  <CardContent className="space-y-4 p-6 text-center">
+                    <div className="text-3xl font-bold">You finished the quiz.</div>
+                    <div className="text-lg text-slate-600">
+                      Perfect answers: <span className="font-semibold text-slate-900">{quizScore} / {quizQuestions.length}</span>
+                    </div>
+                    <div className="flex justify-center">
+                      <Button onClick={restartQuiz} className="rounded-2xl">
+                        <RefreshCw className="mr-2 h-4 w-4" /> Play Quiz Again
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </>
         )}
       </div>
     </div>
